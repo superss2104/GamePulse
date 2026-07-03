@@ -31,7 +31,7 @@ export default function RootLayout({
           }}
         />
         <Navbar />
-        <main className="pt-16">
+        <main className="pt-14">
           {children}
         </main>
         <Footer />
