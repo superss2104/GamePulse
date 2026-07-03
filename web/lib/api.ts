@@ -101,12 +101,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
   ): Promise<JobStatusResponse> {
     while (true) {
       const status = await getJobStatus(jobId);
-      onUpdate?.(status);
+      onUpdate?.(status); //if callback function is provided, call it with the current status
 
       if (status.status === "completed" || status.status === "failed") {
-        return status;
+        return status; 
       }
 
-      await new Promise((r) => setTimeout(r, intervalMs));
+      await new Promise((r) => setTimeout(r, intervalMs)); //Resolve the promise after intervalMs milliseconds
     }
   }
