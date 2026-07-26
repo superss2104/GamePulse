@@ -71,8 +71,8 @@ def audio_samples_to_frame_scores(samples, fps, target_length, sample_rate=DEFAU
     previous_rms = 0.0
 
     for frame_idx in range(target_length):
-        start = int(round(frame_idx * samples_per_frame))
-        end = int(round((frame_idx + 1) * samples_per_frame))
+        start = round(frame_idx * samples_per_frame)
+        end = round((frame_idx + 1) * samples_per_frame)
         chunk = samples[start:end]
 
         if chunk.size == 0:
