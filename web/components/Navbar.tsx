@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-zinc-800 bg-zinc-950/40 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-1">
         <Link href="/" className="flex items-center gap-3 group">
-          <img
+          <Image
             src="/logo.png"
             alt="CSpotlight Logo"
-            className="h-30 w-auto object-contain transition-transform group-hover:scale-110"
+            width={120}
+            height={40}
+            className="h-10 w-auto object-contain transition-transform group-hover:scale-110"
           />
         </Link>
 

@@ -22,8 +22,8 @@ export default function HowItWorks() {
     },
     {
       number: "05",
-      title: "Categorization & Export",
-      description: "Events are merged, categorized (e.g., Single Kill vs Multi-Kill), converted into precise timestamps, and exported via FFmpeg.",
+      title: "Export",
+      description: "Events are merged, converted into precise timestamps, and exported via FFmpeg.",
     },
   ];
 

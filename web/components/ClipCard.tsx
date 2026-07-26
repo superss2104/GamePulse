@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ClipResult } from "@/types";
-import { categoryLabel, formatTimestamp } from "@/lib/utils";
+import { formatTimestamp } from "@/lib/utils";
 import { getDownloadUrl } from "@/lib/api";
 
 interface ClipCardProps {
@@ -12,7 +12,6 @@ interface ClipCardProps {
 
 export default function ClipCard({ clip, jobId }: ClipCardProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
-  const isMultiKill = clip.category === "MULTIPLE_KILLS";
   const videoUrl = getDownloadUrl(jobId, clip.name);
 
   return (
@@ -20,9 +19,9 @@ export default function ClipCard({ clip, jobId }: ClipCardProps) {
       {/* Row content */}
       <div className="flex flex-col sm:flex-row items-stretch">
         {/* Left: Metadata / Rank */}
-        <div className={`flex flex-col justify-center items-center p-4 sm:w-24 border-r border-zinc-800 ${isMultiKill ? 'bg-orange-500/10' : 'bg-zinc-900/50'}`}>
+        <div className="flex flex-col justify-center items-center p-4 sm:w-24 border-r border-zinc-800 bg-zinc-900/50">
           <span className="text-xs font-mono text-zinc-500 mb-1">LEN</span>
-          <span className={`text-lg font-black font-mono ${isMultiKill ? 'text-orange-500' : 'text-zinc-300'}`}>
+          <span className="text-lg font-black font-mono text-zinc-300">
             {formatTimestamp(clip.duration)}
           </span>
         </div>
@@ -30,12 +29,6 @@ export default function ClipCard({ clip, jobId }: ClipCardProps) {
         {/* Middle: Info */}
         <div className="flex-1 p-4 flex flex-col justify-center">
           <div className="flex items-center gap-3 mb-2">
-            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border ${isMultiKill
-                ? 'border-orange-500 text-orange-500 bg-orange-500/10'
-                : 'border-zinc-600 text-zinc-400 bg-zinc-800/50'
-              }`}>
-              {categoryLabel(clip.category)}
-            </span>
             <span className="text-xs font-mono text-zinc-500">
               {formatTimestamp(clip.start)} — {formatTimestamp(clip.end)}
             </span>

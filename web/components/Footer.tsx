@@ -1,7 +1,7 @@
 export default function Footer() {
   return (
     <footer className="border-t border-zinc-800 bg-zinc-950">
-      <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 py-8 sm:flex-row sm:justify-between"> 
+      <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-6 py-13 sm:flex-row sm:justify-between"> 
         {/*If screen width is at least 640px, then apply justify-between and flex-row*/}
         <div className="flex items-center gap-3">
           <span className="text-xs font-bold uppercase tracking-widest text-zinc-300">
