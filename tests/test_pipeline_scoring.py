@@ -7,13 +7,15 @@ from src.highlight.scoring import combine_multiple_scores
 
 
 class PipelineScoringTests(unittest.TestCase):
+    @patch("src.highlight.pipeline.extract_death_mask")
     @patch("src.highlight.pipeline.extract_audio_scores")
     @patch("src.highlight.pipeline.extract_killfeed_data")
-    def test_build_highlight_scores_uses_runtime_weights(self, mock_killfeed_data, mock_extract_audio_scores):
+    def test_build_highlight_scores_uses_runtime_weights(self, mock_killfeed_data, mock_extract_audio_scores, mock_death_mask):
         mock_extract_audio_scores.return_value = [0, 10, 0]
         mock_killfeed_data.return_value = KillfeedResult(scores=[], kill_counts=[])
+        mock_death_mask.return_value = [False, False, False]
 
-        scores, kill_counts = build_highlight_scores(
+        scores, kill_counts, death_mask = build_highlight_scores(
             "video.mp4",
             [0, 0, 0],
             fps=30.0,
@@ -24,17 +26,21 @@ class PipelineScoringTests(unittest.TestCase):
 
         self.assertEqual(scores, [0.0, 1.0, 0.0])
         self.assertEqual(kill_counts, [])
+        self.assertEqual(death_mask, [False, False, False])
 
+    @patch("src.highlight.pipeline.extract_death_mask")
     @patch("src.highlight.pipeline.extract_audio_scores")
     @patch("src.highlight.pipeline.extract_killfeed_data")
-    def test_build_highlight_scores_falls_back_to_motion_only(self, mock_killfeed_data, mock_extract_audio_scores):
+    def test_build_highlight_scores_falls_back_to_motion_only(self, mock_killfeed_data, mock_extract_audio_scores, mock_death_mask):
         mock_extract_audio_scores.return_value = []
         mock_killfeed_data.return_value = KillfeedResult(scores=[], kill_counts=[])
+        mock_death_mask.return_value = [False, False, False]
 
-        scores, kill_counts = build_highlight_scores("video.mp4", [1, 2, 3], fps=30.0)
+        scores, kill_counts, death_mask = build_highlight_scores("video.mp4", [1, 2, 3], fps=30.0)
 
         self.assertEqual(scores, [1, 2, 3])
         self.assertEqual(kill_counts, [])
+        self.assertEqual(death_mask, [False, False, False])
 
 
 

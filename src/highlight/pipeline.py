@@ -2,10 +2,9 @@ import logging
 
 try:
     from ..audio.analysis import extract_audio_scores
-    from ..cs2.killfeed import extract_killfeed_data, extract_killfeed_scores
-    from ..cs2.multikill import build_multikill_mask
+    from ..cs2.deathscreen import extract_death_mask
+    from ..cs2.killfeed import extract_killfeed_data
     from ..video.motion import extract_motion_scores
-    from .categories import CategorizedClip, ClipCategory, categorize_clips, filter_clips_by_category
     from .scoring import combine_multiple_scores, normalize_scores
     from .timestamps import (
         DEFAULT_CLIP_LEN_SECONDS,
@@ -17,9 +16,8 @@ try:
     from .windows import filter_short_events, merge_windows, percentile_threshold, sliding_windows
 except ImportError:  # Support running src/main.py directly.
     from audio.analysis import extract_audio_scores
-    from cs2.killfeed import extract_killfeed_data, extract_killfeed_scores
-    from cs2.multikill import build_multikill_mask
-    from highlight.categories import CategorizedClip, ClipCategory, categorize_clips, filter_clips_by_category
+    from cs2.deathscreen import extract_death_mask
+    from cs2.killfeed import extract_killfeed_data
     from highlight.scoring import combine_multiple_scores, normalize_scores
     from highlight.timestamps import (
         DEFAULT_CLIP_LEN_SECONDS,
@@ -31,45 +29,35 @@ except ImportError:  # Support running src/main.py directly.
     from highlight.windows import filter_short_events, merge_windows, percentile_threshold, sliding_windows
     from video.motion import extract_motion_scores
 
+DEFAULT_START_BIAS_SECONDS = -2.0
+DEFAULT_CLIP_LEN_SECONDS = 4
+DEATH_BACKTRACK_SECONDS = 1.5
+DEATH_POST_TRACK_SECONDS = 0.5
+MIN_DEATH_DURATION_SECONDS = 0.5
+DEATH_MAX_GAP_SECONDS = 0.3
+
 LOGGER = logging.getLogger(__name__)
 WINDOW_STEP_FRAMES = 5
 WINDOW_PERCENTILE = 50
 MIN_EVENT_DURATION_SECONDS = 0.1
-MERGE_GAP_SECONDS = 0.6
+MERGE_GAP_SECONDS = 3.5
 MOTION_SCORE_WEIGHT = 0.25
 AUDIO_SCORE_WEIGHT = 0.25
 KILLFEED_SCORE_WEIGHT = 0.5
 
 
 def detect_highlights(video_path, motion_weight=None, audio_weight=None,
-                      killfeed_weight=None, enabled_categories=None):
-    """Run the full highlight detection pipeline.
-
-    Parameters
-    ----------
-    video_path : str
-        Path to the input video.
-    motion_weight, audio_weight, killfeed_weight : float or None
-        Score fusion weights.  ``None`` uses module-level defaults.
-    enabled_categories : set[ClipCategory] or None
-        Which clip categories to keep.  ``None`` keeps all categories.
-
-    Returns
-    -------
-    list[CategorizedClip]
-        Detected clips with category metadata.  Each item supports tuple
-        unpacking ``(start, end) = clip`` for backwards compatibility.
-    """
+                      killfeed_weight=None):
     motion_scores, fps = extract_motion_scores(video_path)
-    scores, kill_counts = build_highlight_scores(
+    scores, kill_counts, death_mask = build_highlight_scores(
         video_path, motion_scores, fps,
         motion_weight, audio_weight, killfeed_weight,
     )
 
-    window_size = max(1, int(round(fps)))
+    window_size = max(1, round(fps))
     windows = sliding_windows(scores, window_size, WINDOW_STEP_FRAMES)
     highlight_windows = percentile_threshold(windows, percentile=WINDOW_PERCENTILE)
-    merge_gap_frames = max(1, int(round(fps * MERGE_GAP_SECONDS)))
+    merge_gap_frames = max(1, round(fps * MERGE_GAP_SECONDS))
     merged = merge_windows(highlight_windows, max_gap=merge_gap_frames)
     filtered = filter_short_events(merged, fps, MIN_EVENT_DURATION_SECONDS)
 
@@ -81,9 +69,15 @@ def detect_highlights(video_path, motion_weight=None, audio_weight=None,
             i + 1, sf, ef, sf / fps, ef / fps, (ef - sf) / fps,
         )
 
+    # Trim events so they do not extend past a death screen.
+    trimmed = _trim_events_at_death(filtered, death_mask)
+    LOGGER.debug("Death-trimmed events: %s", trimmed)
+
     # Expand events backward using raw motion scores so clips start
     # where the action begins, not where the kill-feed appears.
-    expanded = _expand_events_with_motion(filtered, motion_scores, fps)
+    # Death frames are excluded from expansion to prevent the pipeline
+    # from pulling in the death animation as "action".
+    expanded = _expand_events_with_motion(trimmed, motion_scores, fps, death_mask=death_mask)
     LOGGER.debug("Expanded events: %s", expanded)
     for i, (sf, ef) in enumerate(expanded):
         LOGGER.debug(
@@ -96,6 +90,7 @@ def detect_highlights(video_path, motion_weight=None, audio_weight=None,
         fps,
         clip_len=DEFAULT_CLIP_LEN_SECONDS,
         start_bias=DEFAULT_START_BIAS_SECONDS,
+        death_mask=death_mask,
     )
     LOGGER.debug("Pre-merge timestamps: %s", timestamps)
     for i, (s, e) in enumerate(timestamps):
@@ -109,40 +104,13 @@ def detect_highlights(video_path, motion_weight=None, audio_weight=None,
     for i, (s, e) in enumerate(final):
         LOGGER.debug("  Final clip %d: %.2fs - %.2fs  (duration %.2fs)", i + 1, s, e, e - s)
 
-    # --- Categorize and filter clips ---
-    multikill_mask = build_multikill_mask(kill_counts, fps)
-    categorized = categorize_clips(final, multikill_mask, fps)
-
-    for i, clip in enumerate(categorized):
-        LOGGER.info(
-            "  Clip %d: %.2fs - %.2fs  [%s]",
-            i + 1, clip.start, clip.end, clip.category.name,
-        )
-
-    result = filter_clips_by_category(categorized, enabled_categories)
-    if enabled_categories is not None:
-        LOGGER.info(
-            "Category filter: %d / %d clips kept (enabled: %s)",
-            len(result), len(categorized),
-            ", ".join(c.name for c in enabled_categories),
-        )
-
-    return result
+    return final
 
 
 def build_highlight_scores(
     video_path, motion_scores, fps,
     motion_weight=None, audio_weight=None, killfeed_weight=None,
 ):
-    """Fuse motion, audio, and killfeed signals into a single score stream.
-
-    Returns
-    -------
-    tuple[list[float], list[int]]
-        ``(combined_scores, kill_counts)`` where *kill_counts* is the
-        per-frame raw kill count from the killfeed analysis (empty list
-        if killfeed extraction failed).
-    """
     if motion_weight is None:
         motion_weight = MOTION_SCORE_WEIGHT
     if audio_weight is None:
@@ -152,6 +120,59 @@ def build_highlight_scores(
 
     audio_scores = _extract_audio_safe(video_path, fps, len(motion_scores))
     killfeed_scores, kill_counts = _extract_killfeed_safe(video_path, len(motion_scores))
+    raw_death_mask = _extract_death_mask_safe(video_path, len(motion_scores))
+
+    # Shift death mask backward to cover the red flash/blood screen 
+    # and discard false positive killfeed entries caused by the player's own death.
+    death_mask = [False] * len(raw_death_mask)
+    if any(raw_death_mask):
+        max_gap_frames = int(DEATH_MAX_GAP_SECONDS * fps)
+        bridged_raw = list(raw_death_mask)
+        last_true = -1
+        for i, val in enumerate(bridged_raw):
+            if val:
+                if last_true != -1 and i - last_true <= max_gap_frames:
+                    for j in range(last_true + 1, i):
+                        bridged_raw[j] = True
+                last_true = i
+
+        # Filter out short false-positive death screens
+        min_death_frames = int(MIN_DEATH_DURATION_SECONDS * fps)
+        filtered_raw = [False] * len(bridged_raw)
+        count = 0
+        for i, is_death in enumerate(bridged_raw):
+            if is_death:
+                count += 1
+            else:
+                if count >= min_death_frames:
+                    for j in range(i - count, i):
+                        filtered_raw[j] = True
+                count = 0
+        if count >= min_death_frames:
+            for j in range(len(bridged_raw) - count, len(bridged_raw)):
+                filtered_raw[j] = True
+
+        backtrack_frames = int(DEATH_BACKTRACK_SECONDS * fps)
+        post_frames = int(DEATH_POST_TRACK_SECONDS * fps)
+        for i, is_death in enumerate(filtered_raw):
+            if is_death:
+                start_idx = max(0, i - backtrack_frames)
+                end_idx = min(len(raw_death_mask) - 1, i + post_frames)
+                for j in range(start_idx, end_idx + 1):
+                    death_mask[j] = True
+
+    if killfeed_scores and any(death_mask):
+        suppressed = 0
+        for i in range(min(len(killfeed_scores), len(death_mask))):
+            if death_mask[i] and killfeed_scores[i] > 0:
+                killfeed_scores[i] = 0.0
+                if i < len(kill_counts):
+                    kill_counts[i] = 0
+                suppressed += 1
+        LOGGER.info(
+            "Death-mask suppression: zeroed %d killfeed scores during death-screen frames",
+            suppressed,
+        )
 
     signals = [motion_scores]
     weights = [motion_weight]
@@ -169,7 +190,7 @@ def build_highlight_scores(
 
     if len(signals) == 1:
         LOGGER.info("Using motion-only highlight scores")
-        return motion_scores, kill_counts
+        return motion_scores, kill_counts, death_mask
 
     LOGGER.info(
         "Combining %s scores with weights %s",
@@ -178,9 +199,7 @@ def build_highlight_scores(
     )
 
     combined_scores = combine_multiple_scores(signals, weights)
-    # Zero out any frame where the killfeed signal is absent.  This ensures
-    # that high motion / audio alone (e.g. scoping in) cannot produce a
-    # highlight; a kill-feed entry must be present.
+  
     if killfeed_scores:
         norm_kf = normalize_scores(killfeed_scores)
         gated = 0
@@ -195,7 +214,7 @@ def build_highlight_scores(
         )
 
     _log_score_ranges(motion_scores, audio_scores, killfeed_scores, combined_scores)
-    return combined_scores, kill_counts
+    return combined_scores, kill_counts, death_mask
 
 
 MOTION_LOOKBACK_SECONDS = 4
@@ -206,27 +225,15 @@ MOTION_ACTIVITY_THRESHOLD = 0.15
 
 def _expand_events_with_motion(events, motion_scores, fps,
                                 max_lookback=MOTION_LOOKBACK_SECONDS,
-                                padding=MOTION_ONSET_PADDING_SECONDS):
-    """Expand each event window backward into preceding motion activity.
-
-    The kill-feed is a lagging indicator — it appears *after* the kill.
-    This function scans the raw motion scores backward from each event
-    to find where the action (aiming, shooting) actually started, so the
-    resulting clip captures the full play rather than starting mid-action.
-
-    The algorithm walks backward from each event start in half-second
-    chunks.  As long as a chunk's average normalised motion score exceeds
-    MOTION_ACTIVITY_THRESHOLD, the event start is extended.  When a
-    chunk falls below the threshold (i.e. a calm period), expansion stops.
-    A fixed padding is then added before the detected onset.
-    """
+                                padding=MOTION_ONSET_PADDING_SECONDS,
+                                death_mask=None):
     if not events or not motion_scores:
         return events
 
     norm = normalize_scores(motion_scores)
     max_lookback_frames = int(max_lookback * fps)
     padding_frames = int(padding * fps)
-    chunk_frames = max(1, int(round(fps * MOTION_ONSET_CHUNK_SECONDS)))
+    chunk_frames = max(1, round(fps * MOTION_ONSET_CHUNK_SECONDS))
 
     expanded = []
     for start_frame, end_frame in events:
@@ -238,6 +245,15 @@ def _expand_events_with_motion(events, motion_scores, fps,
             chunk = norm[pos:end_pos]
             if not chunk:
                 break
+
+            # Stop expansion if this chunk contains a death screen.
+            if death_mask and any(death_mask[f] for f in range(pos, end_pos) if f < len(death_mask)):
+                LOGGER.debug(
+                    "  Event %d-%d: expansion stopped at death screen at frame %d",
+                    start_frame, end_frame, pos,
+                )
+                break
+
             chunk_avg = sum(chunk) / len(chunk)
             if chunk_avg > MOTION_ACTIVITY_THRESHOLD:
                 onset = pos
@@ -255,6 +271,43 @@ def _expand_events_with_motion(events, motion_scores, fps,
 
     return expanded
 
+
+def _trim_events_at_death(
+    events: list[tuple[int, int]],
+    death_mask: list[bool],
+) -> list[tuple[int, int]]:
+
+    if not death_mask:
+        return events
+
+    trimmed = []
+    for start_frame, end_frame in events:
+        # Find the first death frame within this event.
+        death_at = None
+        for f in range(start_frame, min(end_frame + 1, len(death_mask))):
+            if death_mask[f]:
+                death_at = f
+                break
+
+        if death_at is None:
+            # No death screen inside this event — keep unchanged.
+            trimmed.append((start_frame, end_frame))
+        elif death_at <= start_frame:
+            # Event starts on a death frame — discard.
+            LOGGER.debug(
+                "  Dropping event %d-%d: starts on death frame %d",
+                start_frame, end_frame, death_at,
+            )
+        else:
+            new_end = death_at - 1
+            LOGGER.debug(
+                "  Trimming event %d-%d: death at frame %d, new end %d",
+                start_frame, end_frame, death_at, new_end,
+            )
+            trimmed.append((start_frame, new_end))
+
+    return trimmed
+
 def _extract_audio_safe(video_path, fps, target_length):
     try:
         return extract_audio_scores(video_path, fps, target_length=target_length)
@@ -267,7 +320,6 @@ def _extract_audio_safe(video_path, fps, target_length):
 
 
 def _extract_killfeed_safe(video_path, target_length):
-    """Return ``(scores, kill_counts)`` with safe fallback."""
     try:
         result = extract_killfeed_data(video_path, target_length)
         return result.scores, result.kill_counts
@@ -277,6 +329,17 @@ def _extract_killfeed_safe(video_path, target_length):
             video_path,
         )
         return [], []
+
+
+def _extract_death_mask_safe(video_path, target_length):
+    try:
+        return extract_death_mask(video_path, target_length)
+    except Exception:
+        LOGGER.exception(
+            "Unexpected death-screen analysis failure for %s. Skipping death detection.",
+            video_path,
+        )
+        return []
 
 
 def _log_score_ranges(motion_scores, audio_scores, killfeed_scores, combined_scores):

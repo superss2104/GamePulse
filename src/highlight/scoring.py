@@ -10,18 +10,7 @@ def normalize_scores(scores):
     span = max_score - min_score
     return [(score - min_score) / span for score in scores] #min-max normalization
 
-
-
-
 def combine_multiple_scores(score_lists, weights):
-    """Fuse N score signals with corresponding weights.
-
-    Each signal is independently min-max normalized to [0, 1].  The first
-    entry in score_lists is treated as the primary signal and determines the
-    output length.  Shorter secondary signals are zero-padded.
-
-    Returns an empty list when the primary signal is empty.
-    """
     if not score_lists or not score_lists[0]:
         return []
     if len(score_lists) != len(weights):
