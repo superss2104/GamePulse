@@ -1,10 +1,6 @@
 export type JobStatus = "queued" | "processing" | "completed" | "failed";
 
-export type ClipCategory = "SINGLE_KILL" | "MULTIPLE_KILLS";
-
 export interface ProcessingSettings {
-  disable_single_kills: boolean;
-  disable_multi_kills: boolean;
   motion_weight: number | null;
   audio_weight: number | null;
   killfeed_weight: number | null;
@@ -31,7 +27,6 @@ export interface ClipResult {
   start: number;
   end: number;
   duration: number;
-  category: ClipCategory;
   download_url: string;
 }
 
@@ -61,8 +56,6 @@ export interface UploadState {
 }
 
 export const DEFAULT_SETTINGS: ProcessingSettings = {
-  disable_single_kills: false,
-  disable_multi_kills: false,
   motion_weight: null,
   audio_weight: null,
   killfeed_weight: null,

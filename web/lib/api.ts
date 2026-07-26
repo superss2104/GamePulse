@@ -1,16 +1,8 @@
-/**
- * CSpotlight API client.
- *
- * Typed wrapper around fetch() for all backend communication.
- * Single source of truth — all API calls go through here.
- */
-
 import type {
   JobStatusResponse,
   ProcessingSettings,
   ProcessResponse,
   UploadResponse,
-  DEFAULT_SETTINGS,
 } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -97,16 +89,39 @@ async function handleResponse<T>(res: Response): Promise<T> {
   export async function pollUntilDone(
     jobId: string,
     onUpdate?: (status: JobStatusResponse) => void,
-    intervalMs: number = 2000
+    intervalMs: number = 2000,
+    maxConsecutiveErrors: number = 5, // tolerate this many consecutive failures before giving up
   ): Promise<JobStatusResponse> {
-    while (true) {
-      const status = await getJobStatus(jobId);
-      onUpdate?.(status); //if callback function is provided, call it with the current status
+    let consecutiveErrors = 0;
 
-      if (status.status === "completed" || status.status === "failed") {
-        return status; 
+    while (true) {
+      try {
+        const status = await getJobStatus(jobId);
+        consecutiveErrors = 0; // reset on any success
+        onUpdate?.(status);
+
+        if (status.status === "completed" || status.status === "failed") {
+          return status;
+        }
+      } catch (err) {
+        consecutiveErrors++;
+        const isApiError = err instanceof ApiError;
+        const isTransient =
+          isApiError && (err.status === 404 || err.status >= 500);
+
+        if (isTransient && consecutiveErrors < maxConsecutiveErrors) {
+          // Server may have briefly restarted — keep trying silently.
+          console.warn(
+            `Polling attempt ${consecutiveErrors}/${maxConsecutiveErrors} failed (${
+              isApiError ? err.status : "network"
+            }), retrying...`
+          );
+        } else {
+          // Exceeded retry budget — surface the error.
+          throw err;
+        }
       }
 
-      await new Promise((r) => setTimeout(r, intervalMs)); //Resolve the promise after intervalMs milliseconds
+      await new Promise((r) => setTimeout(r, intervalMs));
     }
   }

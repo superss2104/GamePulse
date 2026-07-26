@@ -16,23 +16,3 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-export function categoryLabel(category: string): string {
-  switch (category) {
-    case "SINGLE_KILL":
-      return "SINGLE KILL";
-    case "MULTIPLE_KILLS":
-      return "MULTI-KILL";
-    default:
-      return category.toUpperCase();
-  }
-}
-
-export function categoryColor(category: string): string {
-  switch (category) {
-    case "MULTIPLE_KILLS":
-      return "text-orange-500";
-    case "SINGLE_KILL":
-    default:
-      return "text-zinc-400";
-  }
-}
