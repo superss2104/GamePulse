@@ -1,0 +1,8 @@
+# CSpotlight Backend Dependencies
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.30.0,<1.0
+python-multipart>=0.0.9
+
+# Pipeline dependencies (also in project root requirements.txt)
+numpy>=1.26,<3.0
+opencv-python>=4.9,<5.0
