@@ -1,5 +1,5 @@
-"""Save a diagnostic visualization of what the killfeed detector sees."""
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(__file__))
 import cv2
 import numpy as np
@@ -30,7 +30,7 @@ for target_frame in sample_frames:
     contours_all, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Find valid outlines (after hollow check)
-    outlines = find_red_outlines(red_mask, roi_hsv, config)
+    outlines = find_red_outlines(red_mask, config)
 
     # Draw visualizations
     vis_roi = roi.copy()

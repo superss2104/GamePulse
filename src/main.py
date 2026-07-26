@@ -4,7 +4,6 @@ import winsound
 from pathlib import Path
 
 from video.motion import cut_clips, detect_highlights
-from highlight.categories import ClipCategory
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -50,18 +49,6 @@ def parse_args():
         default=None,
         help="Kill-feed score weight for highlight detection.",
     )
-    parser.add_argument(
-        "--disable-single-kills",
-        action="store_true",
-        default=False,
-        help="Exclude single-kill clips from the output.",
-    )
-    parser.add_argument(
-        "--disable-multi-kills",
-        action="store_true",
-        default=False,
-        help="Exclude multi-kill clips from the output.",
-    )
     return parser.parse_args()
 
 
@@ -77,31 +64,17 @@ def main():
     LOGGER.info("Input video: %s", video_path)
     LOGGER.info("Output directory: %s", output_dir)
 
-    # Build the set of enabled clip categories from CLI flags.
-    enabled_categories = None
-    if args.disable_single_kills or args.disable_multi_kills:
-        enabled_categories = set(ClipCategory)
-        if args.disable_single_kills:
-            enabled_categories.discard(ClipCategory.SINGLE_KILL)
-        if args.disable_multi_kills:
-            enabled_categories.discard(ClipCategory.MULTIPLE_KILLS)
-        LOGGER.info("Enabled clip categories: %s",
-                    ", ".join(c.name for c in enabled_categories) or "(none)")
-
     clips = detect_highlights(
         str(video_path),
         motion_weight=args.motion_weight,
         audio_weight=args.audio_weight,
         killfeed_weight=args.killfeed_weight,
-        enabled_categories=enabled_categories,
     )
     LOGGER.info("Detected %d clip windows", len(clips))
-    for i, clip in enumerate(clips):
-        LOGGER.debug("  Clip %d: %.2fs - %.2fs  [%s]", i + 1, clip.start, clip.end, clip.category.name)
+    for i, (s, e) in enumerate(clips):
+        LOGGER.debug("  Clip %d: %.2fs - %.2fs", i + 1, s, e)
 
-    # CategorizedClip supports tuple unpacking, so cut_clips works as-is.
-    timestamps = [(clip.start, clip.end) for clip in clips]
-    cut_clips(str(video_path), timestamps, output_dir=str(output_dir))
+    cut_clips(str(video_path), clips, output_dir=str(output_dir))
     LOGGER.info("Done — %d clips saved to %s", len(clips), output_dir)
     winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
 

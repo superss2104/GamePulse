@@ -25,3 +25,16 @@ ffmpeg/
 ffmpeg-*/
 
 docs/
+
+# --- Design Assets ---
+design/
+
+# --- Debug & Temporary Scripts ---
+debug_killfeed.py
+src/quick_test.py
+
+# --- Notes ---
+cspotlight_interview_script.md
+
+# --- Tests ---
+tests/
