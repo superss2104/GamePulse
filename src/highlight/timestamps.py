@@ -1,6 +1,9 @@
 DEFAULT_CLIP_LEN_SECONDS = 4
-DEFAULT_START_BIAS_SECONDS = -4.0
-DEFAULT_MIN_CLIP_GAP_SECONDS = 0.75
+DEFAULT_START_BIAS_SECONDS = -2.0
+DEFAULT_MIN_CLIP_GAP_SECONDS = 0
+
+
+DEFAULT_END_BIAS_SECONDS = 2.0
 
 
 def frames_to_timestamps(
@@ -8,24 +11,39 @@ def frames_to_timestamps(
     fps,
     clip_len=DEFAULT_CLIP_LEN_SECONDS,
     start_bias=DEFAULT_START_BIAS_SECONDS,
+    end_bias=DEFAULT_END_BIAS_SECONDS,
+    death_mask=None,
 ):
     timestamps = []
 
     for start_frame, end_frame in merged_windows:
-        event_start = start_frame / fps
-        event_end = end_frame / fps
-        event_duration = event_end - event_start
+        target_start_frame = max(0, start_frame + int(start_bias * fps))
+        
+        # Clamp start_frame backward to avoid death screens before the event
+        if death_mask:
+            for f in range(end_frame, target_start_frame - 1, -1):
+                if f < len(death_mask) and death_mask[f]:
+                    target_start_frame = f + 1
+                    break
 
-        clip_start = max(0, event_start + start_bias)
-
-        if event_duration <= clip_len:
-            #Short event implies fixed length clip.
-            clip_end = clip_start + clip_len
+        event_duration_frames = end_frame - target_start_frame
+        target_clip_len_frames = int(clip_len * fps)
+        
+        if event_duration_frames <= target_clip_len_frames:
+            target_end_frame = target_start_frame + target_clip_len_frames
         else:
-            #Long event implies single continuous clip covering the whole event.
-            # Add a small buffer at the end.
-            clip_end = event_end + 2.0
+            target_end_frame = end_frame + int(end_bias * fps)
 
+        # Clamp end_frame forward to avoid death screens after the event
+        if death_mask:
+            for f in range(end_frame + 1, min(target_end_frame + 1, len(death_mask))):
+                if death_mask[f]:
+                    target_end_frame = f - 1
+                    break
+            target_end_frame = min(target_end_frame, len(death_mask) - 1)
+            
+        clip_start = target_start_frame / fps
+        clip_end = max(target_end_frame, target_start_frame) / fps
 
         timestamps.append((clip_start, clip_end))
 
