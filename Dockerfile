@@ -23,4 +23,4 @@ COPY src/ ./src/
 EXPOSE 8000
 
 # Run the FastAPI server using the PORT environment variable provided by Render
-CMD uvicorn server.app:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD python -m uvicorn server.app:app --host 0.0.0.0 --port ${PORT:-8000}
