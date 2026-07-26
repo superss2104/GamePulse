@@ -16,11 +16,31 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 
+import asyncio
+
+async def cleanup_task():
+    """Background task that sweeps expired videos every 15 minutes."""
+    while True:
+        try:
+            # Run the synchronous cleanup function in a thread to prevent blocking
+            cleaned = await asyncio.to_thread(job_manager.cleanup_expired)
+            if cleaned > 0:
+                LOGGER.info("Swept and cleaned up %d expired jobs from the server", cleaned)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            LOGGER.error("Error in cleanup task: %s", e)
+        await asyncio.sleep(900)  # 15 minutes
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI): #lifespan is called when the server starts and when the server stops by FastAPI
     LOGGER.info("CSpotlight API starting up")
+    # Start the background cleanup task
+    cleaner = asyncio.create_task(cleanup_task())
     yield # do nothing
     LOGGER.info("CSpotlight API shutting down")
+    cleaner.cancel()
     job_manager.shutdown()
 
 
