@@ -15,7 +15,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-MAX_UPLOAD_SIZE_MB = int(os.getenv("CSPOTLIGHT_MAX_UPLOAD_MB", "5000"))
+MAX_UPLOAD_SIZE_MB = int(os.getenv("CSPOTLIGHT_MAX_UPLOAD_MB", "2000"))
 MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".webm"}

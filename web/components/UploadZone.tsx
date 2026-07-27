@@ -128,7 +128,7 @@ export default function UploadZone({
               SUPPORTED: MP4, AVI, MKV, MOV, WEBM
             </p>
             <p className="mt-1 text-xs text-zinc-600">
-              MAX SIZE: 500 MB
+              MAX SIZE: 2000 MB
             </p>
           </div>
         )}
