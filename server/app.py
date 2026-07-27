@@ -19,7 +19,6 @@ LOGGER = logging.getLogger(__name__)
 import asyncio
 
 async def cleanup_task():
-    """Background task that sweeps expired videos every 15 minutes."""
     while True:
         try:
             # Run the synchronous cleanup function in a thread to prevent blocking

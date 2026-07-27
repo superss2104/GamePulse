@@ -7,7 +7,7 @@ from src.cs2.killfeed import (
     KillfeedConfig,
     _align_scores,
     _build_red_mask,
-    detect_player_kills,
+    detect_player_kills_detailed,
     find_red_outlines,
     is_hollow_rectangle,
 )
@@ -31,35 +31,35 @@ def _draw_red_outline(frame, x, y, w, h, thickness=2):
 class DetectPlayerKillsTests(unittest.TestCase):
     def test_blank_frame_returns_zero(self):
         frame = _make_blank_frame()
-        score = detect_player_kills(frame)
+        score, _count = detect_player_kills_detailed(frame)
         self.assertEqual(score, 0.0)
 
     def test_single_red_outline_scores_one(self):
         frame = _make_blank_frame()
         # Draw a red outline in the kill-feed ROI region (top-right)
         _draw_red_outline(frame, 1200, 30, 650, 35, thickness=2)
-        score = detect_player_kills(frame)
+        score, _count = detect_player_kills_detailed(frame)
         self.assertGreaterEqual(score, 1.0)
 
     def test_two_red_outlines_scores_higher(self):
         frame = _make_blank_frame()
         _draw_red_outline(frame, 1200, 30, 650, 35, thickness=2)
         _draw_red_outline(frame, 1200, 80, 650, 35, thickness=2)
-        score = detect_player_kills(frame)
+        score, _count = detect_player_kills_detailed(frame)
         self.assertGreater(score, 1.0)
 
     def test_solid_red_rectangle_is_rejected(self):
         frame = _make_blank_frame()
         # Draw a FILLED red rectangle — should be rejected by the hollow check.
         cv2.rectangle(frame, (1200, 30), (1850, 65), (36, 36, 200), -1)
-        score = detect_player_kills(frame)
+        score, _count = detect_player_kills_detailed(frame)
         self.assertEqual(score, 0.0)
 
     def test_red_outside_roi_is_ignored(self):
         frame = _make_blank_frame()
         # Draw red outline in the bottom-left corner (outside kill-feed ROI).
         _draw_red_outline(frame, 50, 900, 400, 35, thickness=2)
-        score = detect_player_kills(frame)
+        score, _count = detect_player_kills_detailed(frame)
         self.assertEqual(score, 0.0)
 
     def test_multi_kill_score_is_capped(self):
@@ -68,7 +68,7 @@ class DetectPlayerKillsTests(unittest.TestCase):
         # Draw 5 outlines — score should be capped at config.max_score.
         for i in range(5):
             _draw_red_outline(frame, 1200, 20 + i * 45, 650, 35, thickness=2)
-        score = detect_player_kills(frame, config=config)
+        score, _count = detect_player_kills_detailed(frame, config=config)
         self.assertLessEqual(score, 2.0)
 
 
@@ -97,7 +97,7 @@ class FindRedOutlinesTests(unittest.TestCase):
         roi = np.zeros((200, 400, 3), dtype=np.uint8)
         roi_hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
         red_mask = _build_red_mask(roi_hsv, KillfeedConfig())
-        outlines = find_red_outlines(red_mask, roi_hsv, KillfeedConfig())
+        outlines = find_red_outlines(red_mask, KillfeedConfig())
         self.assertEqual(outlines, [])
 
     def test_small_noise_is_rejected(self):
@@ -106,7 +106,7 @@ class FindRedOutlinesTests(unittest.TestCase):
         cv2.circle(roi, (100, 100), 3, (36, 36, 200), 1)
         roi_hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
         red_mask = _build_red_mask(roi_hsv, KillfeedConfig())
-        outlines = find_red_outlines(red_mask, roi_hsv, KillfeedConfig())
+        outlines = find_red_outlines(red_mask, KillfeedConfig())
         self.assertEqual(outlines, [])
 
 

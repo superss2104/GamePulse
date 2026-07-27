@@ -3,7 +3,8 @@ import logging
 import winsound
 from pathlib import Path
 
-from video.motion import cut_clips, detect_highlights
+from video.clips import cut_clips
+from highlight.pipeline import detect_highlights
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

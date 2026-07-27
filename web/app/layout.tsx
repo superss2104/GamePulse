@@ -18,8 +18,8 @@ export default function RootLayout({
   children: React.ReactNode; //Children is a built-in prop in Next.js that represents the content of the current page.
 }) {
   return (
-    <html lang="en" className="dark scroll-smooth">
-      <body className={`${inter.className} min-h-screen bg-zinc-950 text-zinc-50 antialiased selection:bg-orange-500/30`}>
+    <html lang="en" className="dark scroll-smooth" suppressHydrationWarning>
+      <body className={`${inter.className} min-h-screen bg-zinc-950 text-zinc-50 antialiased selection:bg-orange-500/30`} suppressHydrationWarning>
         <div 
           className="fixed inset-0 z-[-1] pointer-events-none"
           style={{

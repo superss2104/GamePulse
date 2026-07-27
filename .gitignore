@@ -38,3 +38,13 @@ cspotlight_interview_script.md
 
 # --- Tests ---
 tests/
+
+# --- Internal Docs ---
+web_docs/
+server_docs/
+PIPELINE_DOCUMENTATION.md
+
+# --- Secrets & Keys ---
+*.key
+*.pub
+ssh-key-*

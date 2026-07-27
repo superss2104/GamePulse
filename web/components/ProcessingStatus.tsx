@@ -107,7 +107,7 @@ export default function ProcessingStatus({ status }: ProcessingStatusProps) { //
                       ANALYZING MATCH...
                     </div>
                     <div className="text-[10px] font-mono text-zinc-500 uppercase">
-                      ETA: ~1-2 MINUTES
+                      Please Wait...
                     </div>
                   </div>
                 </div>
