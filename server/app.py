@@ -1,12 +1,17 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from server.api.routes import router
 from server.config import CORS_ORIGINS
 from server.processing.worker import job_manager
+
+DEMO_VIDEOS_DIR = Path(__file__).resolve().parent / "demo_videos"
+DEMO_VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,6 +64,10 @@ app.add_middleware( #add middleware to the app
 )
 
 app.include_router(router) # include router (API endpoints) in the app
+
+# Mount demo video assets as a static directory.
+# Videos placed in server/demo_videos/ are served at /demo-videos/<filename>.
+app.mount("/demo-videos", StaticFiles(directory=str(DEMO_VIDEOS_DIR)), name="demo-videos")
 
 @app.get("/health", tags=["system"])  #map a GET request to the /health path
 async def health_check(): 

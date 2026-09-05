@@ -125,3 +125,16 @@ async function handleResponse<T>(res: Response): Promise<T> {
       await new Promise((r) => setTimeout(r, intervalMs));
     }
   }
+
+  // Trigger the pipeline on a pre-loaded demo clip (no upload required).
+  export async function processDemoClip(
+    clipId: string
+  ): Promise<{ job_id: string; clip_title: string }> {
+    const res = await fetch(`${API_BASE}/demo/process`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clip_id: clipId }),
+    });
+    return handleResponse<{ job_id: string; clip_title: string }>(res);
+  }
+

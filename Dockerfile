@@ -19,6 +19,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY server/ ./server/
 COPY src/ ./src/
 
+# Copy demo video assets for the showcase section
+COPY server/demo_videos/ ./server/demo_videos/
+
 # Expose backend API port
 EXPOSE 8000
 

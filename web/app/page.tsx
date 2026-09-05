@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"; //Next.js router to handle client-s
 import HeroSection from "@/components/HeroSection"; //The top section of the page with the title and description.
 import UploadZone from "@/components/UploadZone"; //The section where the user can upload a video.
 import HowItWorks from "@/components/HowItWorks"; //The section that explains how the app works.
+import DemoShowcase from "@/components/DemoShowcase"; //Sample demo clips showcasing pipeline output.
 import { uploadVideo, startProcessing } from "@/lib/api"; //uploadVideo and startProcessing are functions that are used to upload the video and start the processing.
 import { DEFAULT_SETTINGS } from "@/types"; //DEFAULT_SETTINGS is an object that contains the default settings.
 
@@ -53,6 +54,7 @@ export default function Home() {
 
       </div>
 
+      <DemoShowcase />
       <HowItWorks />
     </div>
   );

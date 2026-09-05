@@ -1,7 +1,9 @@
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from server.config import MAX_UPLOAD_SIZE_BYTES
 from server.models.schemas import (
@@ -21,6 +23,20 @@ from server.services.storage import (
 )
 
 LOGGER = logging.getLogger(__name__)
+
+# Pre-loaded demo clips that users can process without uploading.
+DEMO_VIDEOS_DIR = Path(__file__).resolve().parent.parent / "demo_videos"
+
+DEMO_CLIPS = {
+    "test13": {
+        "filename": "test13.mp4",
+        "title": "AWP Flick Shot",
+    },
+    "test6": {
+        "filename": "test6.mp4",
+        "title": "3 kills highlight",
+    },
+}
 
 router = APIRouter()
 
@@ -119,3 +135,44 @@ async def download_clip(job_id: str, filename: str):
         filename=filename,
         headers={"Accept-Ranges": "bytes"},
     )
+
+
+# --- Demo endpoint: process a pre-loaded sample clip ---
+
+class DemoRequest(BaseModel):
+    clip_id: str
+
+class DemoResponse(BaseModel):
+    job_id: str
+    clip_title: str
+
+@router.post(
+    "/demo/process",
+    response_model=DemoResponse,
+    status_code=202,
+    responses={404: {"model": ErrorResponse}},
+    summary="Process a pre-loaded demo clip through the pipeline",
+)
+async def process_demo_clip(request: DemoRequest):
+    clip = DEMO_CLIPS.get(request.clip_id)
+    if clip is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Demo clip '{request.clip_id}' not found. Available: {list(DEMO_CLIPS.keys())}",
+        )
+
+    video_path = DEMO_VIDEOS_DIR / clip["filename"]
+    if not video_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Demo video file not found on server: {clip['filename']}",
+        )
+
+    # Register and immediately submit for processing (skip the upload step).
+    job_id = generate_job_id()
+    job_manager.register(job_id, str(video_path))
+    job_manager.submit(job_id)
+
+    LOGGER.info("Demo processing started: job=%s clip=%s", job_id, request.clip_id)
+    return DemoResponse(job_id=job_id, clip_title=clip["title"])
+
