@@ -28,7 +28,7 @@ JOB_TTL_SECONDS = int(os.getenv("CSPOTLIGHT_JOB_TTL", "3600"))
 
 CORS_ORIGINS = os.getenv(
     "CSPOTLIGHT_CORS_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000",
+    "*",
 ).split(",")
 
 LOCAL_FFMPEG = PROJECT_ROOT / "ffmpeg" / "bin" / "ffmpeg.exe"
